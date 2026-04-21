@@ -9,3 +9,4 @@ scripts/_task.xml
 dist/
 build/
 *.spec
+.claude/
