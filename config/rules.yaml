@@ -1,0 +1,181 @@
+# =====================================================
+#   FILE ORGANIZER - Reglas de clasificacion
+# =====================================================
+# subcarpeta_por_año: true  → crea carpeta con el año  (ej: 2026/)
+# subcarpeta_por_mes: true  → dentro del año, crea carpeta con el mes (ej: Abril/)
+# subcarpeta_por_mes solo funciona si subcarpeta_por_año tambien es true
+
+categorias:
+
+  # ── IMAGENES ─────────────────────────────────────
+  Imagenes:
+    destino: Imagenes
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: true
+    extensiones:
+      - .jpg
+      - .jpeg
+      - .png
+      - .gif
+      - .bmp
+      - .webp
+      - .svg
+      - .tiff
+      - .ico
+      - .heic
+      - .raw
+
+  # ── VIDEOS ───────────────────────────────────────
+  Videos:
+    destino: Videos
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: false
+    extensiones:
+      - .mp4
+      - .mkv
+      - .avi
+      - .mov
+      - .wmv
+      - .flv
+      - .webm
+      - .m4v
+
+  # ── MUSICA ───────────────────────────────────────
+  Musica:
+    destino: Musica
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .mp3
+      - .wav
+      - .flac
+      - .aac
+      - .ogg
+      - .m4a
+      - .wma
+
+  # ── DOCUMENTOS: PDF ──────────────────────────────
+  PDF:
+    destino: Documentos/PDF
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: true
+    extensiones:
+      - .pdf
+
+  # ── DOCUMENTOS: WORD ─────────────────────────────
+  Word:
+    destino: Documentos/Word
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: true
+    extensiones:
+      - .doc
+      - .docx
+      - .odt
+      - .rtf
+      - .pages
+
+  # ── DOCUMENTOS: TEXTO PLANO ──────────────────────
+  Texto:
+    destino: Documentos/Texto
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .txt
+
+  # ── DOCUMENTOS: HOJAS DE CALCULO ─────────────────
+  HojasDeCalculo:
+    destino: Documentos/HojasDeCalculo
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: false
+    extensiones:
+      - .xls
+      - .xlsx
+      - .csv
+      - .ods
+      - .numbers
+
+  # ── DOCUMENTOS: PRESENTACIONES ───────────────────
+  Presentaciones:
+    destino: Documentos/Presentaciones
+    subcarpeta_por_año: true
+    subcarpeta_por_mes: false
+    extensiones:
+      - .ppt
+      - .pptx
+      - .odp
+      - .key
+
+  # ── CODIGO ───────────────────────────────────────
+  Codigo:
+    destino: Codigo
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .py
+      - .js
+      - .ts
+      - .html
+      - .css
+      - .java
+      - .cpp
+      - .c
+      - .cs
+      - .go
+      - .rb
+      - .php
+      - .sh
+      - .json
+      - .xml
+      - .sql
+      - .yaml
+      - .yml
+      - .md
+
+  # ── COMPRIMIDOS ──────────────────────────────────
+  Comprimidos:
+    destino: Comprimidos
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .zip
+      - .rar
+      - .7z
+      - .tar
+      - .gz
+      - .bz2
+      - .xz
+
+  # ── INSTALADORES ─────────────────────────────────
+  Instaladores:
+    destino: Instaladores
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .exe
+      - .msi
+      - .dmg
+      - .pkg
+      - .deb
+      - .rpm
+      - .appimage
+
+  # ── FUENTES ──────────────────────────────────────
+  Fuentes:
+    destino: Fuentes
+    subcarpeta_por_año: false
+    subcarpeta_por_mes: false
+    extensiones:
+      - .ttf
+      - .otf
+      - .woff
+      - .woff2
+
+# Carpeta para archivos sin categoria reconocida
+sin_categoria:
+  destino: Otros
+
+# Si ya existe un archivo con el mismo nombre en destino:
+# "renombrar"  = agrega un numero (documento_1.pdf)
+# "saltar"     = no hace nada con ese archivo
+# "reemplazar" = sobreescribe el archivo existente
+conflicto: renombrar

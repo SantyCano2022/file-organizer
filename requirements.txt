@@ -1,0 +1,5 @@
+watchdog==6.0.0
+pyyaml==6.0.2
+colorlog==6.8.2
+python-dotenv==1.0.1
+customtkinter==5.2.2

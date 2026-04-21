@@ -1,0 +1,11 @@
+.env
+logs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+scripts/_task.xml
+dist/
+build/
+*.spec

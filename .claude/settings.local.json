@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(python -c \"import yaml; import shutil; print\\('OK'\\)\")"
+    ]
+  }
+}
