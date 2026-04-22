@@ -5,6 +5,7 @@ Automatización de archivos que monitorea una carpeta en tiempo real y clasifica
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-12%20passed-brightgreen?logo=pytest)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
+![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 
 ---
 
@@ -14,6 +15,8 @@ No necesitás instalar Python ni nada. Descargá el ejecutable desde la sección
 
 La primera vez te pide que elijas la carpeta a monitorear y la carpeta de destino. Esa configuración queda guardada para las próximas veces.
 
+> Si Windows muestra una advertencia de SmartScreen, hacé clic en **"Más información"** → **"Ejecutar de todas formas"**.
+
 ---
 
 ## Cómo funciona
@@ -22,11 +25,13 @@ El programa observa la carpeta configurada (por defecto `Downloads`) y en el mom
 
 ```
 Downloads/
-    factura.pdf      →   Documentos/PDF/2026/Abril/
-    foto_viaje.jpg   →   Imagenes/2026/Abril/
-    presupuesto.xlsx →   Documentos/HojasDeCalculo/2026/
-    cancion.mp3      →   Musica/
+    factura_2024-08-20.pdf   →   Documentos/PDF/2024/Agosto/
+    foto_viaje.jpg           →   Imagenes/2026/Abril/
+    presupuesto.xlsx         →   Documentos/HojasDeCalculo/2026/
+    cancion.mp3              →   Musica/
 ```
+
+Si el archivo tiene una fecha en el nombre (`factura_2024-08-20.pdf`, `radicado_20230315.pdf`), la usa para clasificarlo en el año y mes correcto. Si no tiene fecha, usa la fecha de modificación del archivo.
 
 Los archivos que todavía se están descargando (`.crdownload`, `.part`, `.tmp`) se ignoran hasta que la descarga termina.
 
@@ -34,13 +39,17 @@ Los archivos que todavía se están descargando (`.crdownload`, `.part`, `.tmp`)
 
 ## Características
 
-- Interfaz gráfica para configurar y controlar el organizador sin tocar código
-- Detección en tiempo real usando eventos del sistema de archivos (`watchdog`)
+- **Interfaz gráfica** para configurar y controlar el organizador sin tocar código
+- **Detección en tiempo real** usando eventos del sistema de archivos (`watchdog`)
+- **Bandeja del sistema** — al cerrar la ventana el programa sigue corriendo en segundo plano (área de notificaciones al lado del reloj)
+- **Notificaciones de Windows** — cada archivo movido muestra una notificación con el nombre y la carpeta destino
+- **Iniciar con Windows** — checkbox en la app para que arranque automáticamente al encender la PC
+- **Botón Deshacer** — revierte el último movimiento con un clic (historial de 20 movimientos)
+- **Detección de fecha en el nombre del archivo** — organiza por la fecha del nombre si la tiene, o por fecha de modificación si no
 - 11 categorías predefinidas: Imágenes, Videos, Música, PDF, Word, Excel, Código, Comprimidos, Instaladores y más
 - Subcarpetas por año y mes: `Imagenes/2026/Abril/`, `Documentos/PDF/2025/Junio/`
 - Manejo de archivos duplicados: renombra, reemplaza o ignora según configuración
 - Reglas completamente editables en `config/rules.yaml` sin tocar el código
-- Logs en consola con colores y registro mensual en archivo
 
 ---
 
@@ -63,7 +72,7 @@ file-organizer/
 │   └── test_organizer.py       # Tests automatizados con pytest
 │
 ├── scripts/
-│   └── setup_autostart.py      # Configura el arranque automático en Windows
+│   └── setup_autostart.py      # Configura el arranque automático en Windows (CLI)
 │
 ├── main.py                     # Entrada por línea de comandos
 └── main_gui.py                 # Entrada con interfaz gráfica
@@ -137,17 +146,6 @@ Comportamiento ante archivos duplicados:
 
 ---
 
-## Arranque automático con Windows
-
-```bash
-python scripts/setup_autostart.py
-
-# Para desinstalarlo
-python scripts/setup_autostart.py --remove
-```
-
----
-
 ## Tests
 
 ```bash
@@ -183,6 +181,9 @@ tests/test_organizer.py::TestMoveFile::test_stats_are_updated                   
 | `colorlog` | 6.8.2 | Formato de logs con colores en la consola |
 | `python-dotenv` | 1.0.1 | Carga de variables de entorno desde `.env` |
 | `customtkinter` | 5.2.2 | Interfaz gráfica moderna |
+| `pystray` | 0.19.5 | Icono y menú en la bandeja del sistema |
+| `pillow` | 12.2.0 | Generación del icono para la bandeja |
+| `plyer` | 2.1.0 | Notificaciones nativas de Windows |
 
 ---
 
