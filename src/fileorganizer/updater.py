@@ -1,10 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.2.1"
+VERSION = "1.3.1"
 _REPO   = "SantyCano2022/file-organizer"
 _API    = f"https://api.github.com/repos/{_REPO}/releases/latest"
 
@@ -38,8 +39,9 @@ def download_and_apply(url: str, on_progress=None) -> bool:
     if not getattr(sys, "frozen", False):
         return False
 
-    current = Path(sys.executable)
-    tmp     = current.parent / f"{current.stem}_update.exe"
+    current  = Path(sys.executable).resolve()
+    tmp_dir  = Path(os.environ.get("TEMP", str(current.parent)))
+    tmp      = tmp_dir / f"{current.stem}_update.exe"
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "FileOrganizer"})
@@ -56,10 +58,10 @@ def download_and_apply(url: str, on_progress=None) -> bool:
         tmp.unlink(missing_ok=True)
         return False
 
-    bat = current.parent / "_update.bat"
+    bat = tmp_dir / "_fo_update.bat"
     bat.write_text(
         "@echo off\n"
-        "timeout /t 3 /nobreak > NUL\n"
+        "timeout /t 6 /nobreak > NUL\n"
         f'move /Y "{tmp}" "{current}"\n'
         f'start "" "{current}"\n'
         'del "%~f0"\n',
