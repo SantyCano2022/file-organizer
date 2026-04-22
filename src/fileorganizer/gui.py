@@ -2,10 +2,14 @@ import json
 import logging
 import sys
 import threading
+import winreg
 from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
+import pystray
+from PIL import Image, ImageDraw
+from plyer import notification
 from watchdog.observers import Observer
 
 from fileorganizer.organizer import FileOrganizer
@@ -15,14 +19,18 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 SETTINGS_FILE = Path.home() / ".file_organizer_settings.json"
+REGISTRY_KEY  = r"Software\Microsoft\Windows\CurrentVersion\Run"
+REGISTRY_NAME = "FileOrganizer"
 
-GREEN  = "#22c55e"
-RED    = "#ef4444"
-MUTED  = "#94a3b8"
-BTN_RED       = ("#dc2626", "#dc2626")
-BTN_RED_HOVER = ("#b91c1c", "#b91c1c")
-BTN_BLUE      = ("#2563eb", "#2563eb")
-BTN_BLUE_HOVER= ("#1d4ed8", "#1d4ed8")
+GREEN          = "#22c55e"
+RED            = "#ef4444"
+MUTED          = "#94a3b8"
+BTN_RED        = ("#dc2626", "#dc2626")
+BTN_RED_HOVER  = ("#b91c1c", "#b91c1c")
+BTN_BLUE       = ("#2563eb", "#2563eb")
+BTN_BLUE_HOVER = ("#1d4ed8", "#1d4ed8")
+BTN_GRAY       = ("#475569", "#475569")
+BTN_GRAY_HOVER = ("#334155", "#334155")
 
 
 def _config_path() -> Path:
@@ -31,8 +39,17 @@ def _config_path() -> Path:
     return Path(__file__).parent.parent.parent / "config" / "rules.yaml"
 
 
+def _create_tray_icon() -> Image.Image:
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([2, 2, 62, 62], fill="#2563eb")
+    draw.rectangle([18, 14, 24, 50], fill="white")
+    draw.rectangle([18, 14, 44, 22], fill="white")
+    draw.rectangle([18, 30, 40, 37], fill="white")
+    return img
+
+
 class _GUILogHandler(logging.Handler):
-    """Redirige mensajes del logger al textbox de la GUI."""
     def __init__(self, callback):
         super().__init__()
         self.callback = callback
@@ -49,17 +66,19 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("File Organizer")
-        self.geometry("700x590")
+        self.geometry("700x720")
         self.resizable(False, False)
 
         self.observer: Observer | None = None
         self.organizer: FileOrganizer | None = None
         self.running = False
         self._log_handler: _GUILogHandler | None = None
+        self._tray_icon: pystray.Icon | None = None
 
         self._build_ui()
         self._attach_logger()
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._setup_tray()
+        self.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
 
     # ── Persistencia ──────────────────────────────────────────────────────────
 
@@ -113,7 +132,6 @@ class App(ctk.CTk):
         card.pack(fill="x", padx=20, pady=(16, 8))
         card.columnconfigure(0, weight=1)
 
-        # Watch folder
         ctk.CTkLabel(card, text="Carpeta a monitorear", font=("Segoe UI", 12, "bold")).grid(
             row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(14, 2),
         )
@@ -124,7 +142,6 @@ class App(ctk.CTk):
             row=1, column=1, padx=(0, 16), pady=(0, 10),
         )
 
-        # Output folder
         ctk.CTkLabel(card, text="Carpeta de destino", font=("Segoe UI", 12, "bold")).grid(
             row=2, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 2),
         )
@@ -135,27 +152,49 @@ class App(ctk.CTk):
             row=3, column=1, padx=(0, 16), pady=(0, 10),
         )
 
-        # Options row
-        opts = ctk.CTkFrame(card, fg_color="transparent")
-        opts.grid(row=4, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 14))
-        ctk.CTkLabel(opts, text="Delay antes de mover:").pack(side="left")
-        self.delay_entry = ctk.CTkEntry(opts, width=44, height=30)
+        # Fila de opciones 1: delay + organizar existentes
+        opts1 = ctk.CTkFrame(card, fg_color="transparent")
+        opts1.grid(row=4, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 6))
+        ctk.CTkLabel(opts1, text="Delay antes de mover:").pack(side="left")
+        self.delay_entry = ctk.CTkEntry(opts1, width=44, height=30)
         self.delay_entry.pack(side="left", padx=(6, 4))
         self.delay_entry.insert(0, cfg.get("delay", "3"))
-        ctk.CTkLabel(opts, text="seg", text_color=MUTED).pack(side="left", padx=(0, 20))
+        ctk.CTkLabel(opts1, text="seg", text_color=MUTED).pack(side="left", padx=(0, 20))
         self.existing_var = ctk.BooleanVar(value=cfg.get("organize_existing", True))
-        ctk.CTkCheckBox(opts, text="Organizar archivos existentes al iniciar", variable=self.existing_var).pack(side="left")
+        ctk.CTkCheckBox(opts1, text="Organizar archivos existentes al iniciar", variable=self.existing_var).pack(side="left")
 
-        # Start/stop button
+        # Fila de opciones 2: iniciar con Windows
+        opts2 = ctk.CTkFrame(card, fg_color="transparent")
+        opts2.grid(row=5, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 14))
+        self.autostart_var = ctk.BooleanVar(value=self._is_autostart_enabled())
+        ctk.CTkCheckBox(
+            opts2, text="Iniciar con Windows",
+            variable=self.autostart_var,
+            command=self._toggle_autostart,
+        ).pack(side="left")
+
+        # Fila de botones: Iniciar/Detener + Deshacer
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=(0, 10))
+        btn_row.columnconfigure(0, weight=1)
+
         self.start_btn = ctk.CTkButton(
-            self, text="▶   Iniciar",
+            btn_row, text="▶   Iniciar",
             font=("Segoe UI", 14, "bold"), height=44, corner_radius=8,
             fg_color=BTN_BLUE, hover_color=BTN_BLUE_HOVER,
             command=self._toggle,
         )
-        self.start_btn.pack(fill="x", padx=20, pady=(0, 12))
+        self.start_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        # Log area
+        self.undo_btn = ctk.CTkButton(
+            btn_row, text="↩  Deshacer",
+            font=("Segoe UI", 13), height=44, width=140, corner_radius=8,
+            fg_color=BTN_GRAY, hover_color=BTN_GRAY_HOVER,
+            command=self._undo,
+        )
+        self.undo_btn.grid(row=0, column=1)
+
+        # Log
         log_card = ctk.CTkFrame(self, corner_radius=10)
         log_card.pack(fill="both", expand=True, padx=20, pady=(0, 8))
         ctk.CTkLabel(log_card, text="Actividad en tiempo real", font=("Segoe UI", 12, "bold")).pack(
@@ -164,16 +203,99 @@ class App(ctk.CTk):
         self.log_box = ctk.CTkTextbox(log_card, font=("Consolas", 11), state="disabled", corner_radius=6)
         self.log_box.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
-        # Stats
+        # Stats + mensaje de bandeja
         self.stats_label = ctk.CTkLabel(
             self, text="Movidos: 0   |   Saltados: 0   |   Errores: 0",
             font=("Segoe UI", 11), text_color=MUTED,
         )
-        self.stats_label.pack(pady=(0, 10))
+        self.stats_label.pack()
+        ctk.CTkLabel(
+            self, text="Cerrar ventana minimiza al área de notificaciones",
+            font=("Segoe UI", 10), text_color=MUTED,
+        ).pack(pady=(2, 10))
 
     def _attach_logger(self):
         self._log_handler = _GUILogHandler(self._append_log)
         logging.getLogger("FileOrganizer").addHandler(self._log_handler)
+
+    # ── System Tray ───────────────────────────────────────────────────────────
+
+    def _setup_tray(self):
+        image = _create_tray_icon()
+        menu = pystray.Menu(
+            pystray.MenuItem("Mostrar ventana", self._show_window, default=True),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Salir", self._quit_app),
+        )
+        self._tray_icon = pystray.Icon("FileOrganizer", image, "File Organizer", menu)
+        threading.Thread(target=self._tray_icon.run, daemon=True).start()
+
+    def _hide_to_tray(self):
+        self.withdraw()
+
+    def _show_window(self, icon=None, item=None):
+        self.after(0, self.deiconify)
+        self.after(0, self.lift)
+        self.after(0, self.focus_force)
+
+    def _quit_app(self, icon=None, item=None):
+        if self._tray_icon:
+            self._tray_icon.stop()
+        self.after(0, self._do_quit)
+
+    def _do_quit(self):
+        if self.running:
+            self._stop()
+        self.destroy()
+
+    # ── Arranque con Windows ──────────────────────────────────────────────────
+
+    def _is_autostart_enabled(self) -> bool:
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REGISTRY_KEY)
+            winreg.QueryValueEx(key, REGISTRY_NAME)
+            winreg.CloseKey(key)
+            return True
+        except (FileNotFoundError, OSError):
+            return False
+
+    def _toggle_autostart(self):
+        enable = self.autostart_var.get()
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REGISTRY_KEY, 0, winreg.KEY_SET_VALUE)
+            if enable:
+                if getattr(sys, "frozen", False):
+                    cmd = f'"{sys.executable}"'
+                else:
+                    script = str(Path(__file__).parent.parent.parent / "main_gui.py")
+                    cmd = f'"{sys.executable}" "{script}"'
+                winreg.SetValueEx(key, REGISTRY_NAME, 0, winreg.REG_SZ, cmd)
+                self._append_log("Arranque con Windows activado.")
+            else:
+                try:
+                    winreg.DeleteValue(key, REGISTRY_NAME)
+                except FileNotFoundError:
+                    pass
+                self._append_log("Arranque con Windows desactivado.")
+            winreg.CloseKey(key)
+        except Exception as e:
+            self._append_log(f"Error al configurar arranque: {e}")
+            self.autostart_var.set(not enable)
+
+    # ── Notificaciones ────────────────────────────────────────────────────────
+
+    def _notify(self, filename: str, destination: str):
+        def _do():
+            try:
+                notification.notify(
+                    title="File Organizer",
+                    message=f"{filename}\n→ {Path(destination).name}",
+                    app_name="File Organizer",
+                    timeout=4,
+                )
+            except Exception:
+                pass
+        threading.Thread(target=_do, daemon=True).start()
 
     # ── Acciones ──────────────────────────────────────────────────────────────
 
@@ -210,10 +332,15 @@ class App(ctk.CTk):
         delay = int(delay_str) if delay_str.isdigit() else 3
         self._save_settings()
 
-        self.organizer = FileOrganizer(str(_config_path()), output_folder, move_delay=delay)
+        self.organizer = FileOrganizer(
+            str(_config_path()), output_folder, move_delay=delay,
+            on_file_moved=self._notify,
+        )
 
         if self.existing_var.get():
-            threading.Thread(target=self.organizer.organize_existing, args=(watch_folder,), daemon=True).start()
+            threading.Thread(
+                target=self.organizer.organize_existing, args=(watch_folder,), daemon=True
+            ).start()
 
         handler = OrganizeHandler(self.organizer, watch_folder)
         self.observer = Observer()
@@ -239,6 +366,15 @@ class App(ctk.CTk):
                 f"Sesión terminada — Movidos: {s['movidos']} | Saltados: {s['saltados']} | Errores: {s['errores']}"
             )
 
+    def _undo(self):
+        if not self.organizer:
+            self._append_log("Iniciá el organizador primero para poder deshacer movimientos.")
+            return
+        if not self.organizer.move_history:
+            self._append_log("No hay movimientos recientes para deshacer.")
+            return
+        self.organizer.undo_last()
+
     def _poll_stats(self):
         if self.running and self.organizer:
             s = self.organizer.stats
@@ -255,8 +391,3 @@ class App(ctk.CTk):
         self.log_box.insert("end", msg + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
-
-    def _on_close(self):
-        if self.running:
-            self._stop()
-        self.destroy()

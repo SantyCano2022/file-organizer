@@ -1,9 +1,10 @@
 import re
 import shutil
 import time
+from collections import deque
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Optional
 
 import yaml
 
@@ -13,12 +14,16 @@ logger = setup_logger()
 
 
 class FileOrganizer:
-    def __init__(self, config_path: str, output_folder: str, move_delay: int = 3):
+    def __init__(self, config_path: str, output_folder: str, move_delay: int = 3,
+                 on_file_moved: Optional[Callable[[str, str], None]] = None):
         self.output_folder = Path(output_folder)
         self.move_delay = move_delay
         self.config = self._load_config(config_path)
         self.extension_map = self._build_extension_map()
         self.stats = {"movidos": 0, "saltados": 0, "errores": 0}
+        self.on_file_moved = on_file_moved
+        self.move_history: deque = deque(maxlen=20)
+        self._batch_mode = False
 
     def _load_config(self, config_path: str) -> dict:
         with open(config_path, "r", encoding="utf-8") as f:
@@ -156,6 +161,12 @@ class FileOrganizer:
             cat_name = categoria["categoria"] if categoria else "Otros"
             logger.info(f"[{cat_name}] {file_path.name}  →  {destino_final.parent}")
             self.stats["movidos"] += 1
+            self.move_history.append((file_path, destino_final))
+            if not self._batch_mode and self.on_file_moved:
+                try:
+                    self.on_file_moved(file_path.name, str(destino_final.parent))
+                except Exception:
+                    pass
             return True
         except PermissionError:
             logger.error(f"Sin permiso para mover: {file_path.name}")
@@ -171,9 +182,37 @@ class FileOrganizer:
         files = [f for f in watch_folder.iterdir() if f.is_file()]
         if not files:
             return
+        self._batch_mode = True
         logger.info(f"Organizando {len(files)} archivos existentes...")
-        for file_path in files:
-            self.move_file(file_path)
+        try:
+            for file_path in files:
+                self.move_file(file_path)
+        finally:
+            self._batch_mode = False
+
+    def undo_last(self) -> bool:
+        """Revierte el último movimiento registrado."""
+        if not self.move_history:
+            return False
+        original, moved_to = self.move_history.pop()
+        if not moved_to.exists():
+            logger.warning(f"No se puede deshacer: {moved_to.name} ya no existe en destino")
+            return False
+        try:
+            original.parent.mkdir(parents=True, exist_ok=True)
+            dest = original
+            if dest.exists():
+                stem, suffix, counter = dest.stem, dest.suffix, 1
+                while dest.exists():
+                    dest = dest.parent / f"{stem}_{counter}{suffix}"
+                    counter += 1
+            shutil.move(str(moved_to), str(dest))
+            logger.info(f"[Deshacer] {moved_to.name}  →  {dest.parent}")
+            self.stats["movidos"] = max(0, self.stats["movidos"] - 1)
+            return True
+        except Exception as e:
+            logger.error(f"Error al deshacer: {e}")
+            return False
 
     def print_stats(self):
         logger.info(
