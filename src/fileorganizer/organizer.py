@@ -1,3 +1,4 @@
+import re
 import shutil
 import time
 from pathlib import Path
@@ -43,6 +44,38 @@ class FileOrganizer:
                 }
         return ext_map
 
+    # Patrones de fecha soportados en nombres de archivo
+    _DATE_PATTERNS = [
+        (r"(\d{4})[-_/\.](\d{2})[-_/\.](\d{2})", "ymd"),  # 2024-08-20, 2024_08_20
+        (r"(\d{2})[-_/\.](\d{2})[-_/\.](\d{4})", "dmy"),  # 20-08-2024, 20/08/2024
+        (r"(\d{4})(\d{2})(\d{2})",                 "ymd"),  # 20240820
+    ]
+
+    def _extract_date_from_name(self, filename: str) -> Optional[datetime]:
+        """Intenta extraer una fecha del nombre del archivo."""
+        for pattern, order in self._DATE_PATTERNS:
+            match = re.search(pattern, filename)
+            if match:
+                a, b, c = match.group(1), match.group(2), match.group(3)
+                try:
+                    if order == "ymd":
+                        year, month, day = int(a), int(b), int(c)
+                    else:
+                        day, month, year = int(a), int(b), int(c)
+                    if 1 <= month <= 12 and 1 <= day <= 31 and 1900 <= year <= 2100:
+                        return datetime(year, month, day)
+                except ValueError:
+                    continue
+        return None
+
+    def _get_fecha(self, file_path: Path) -> datetime:
+        """Devuelve la fecha a usar: primero busca en el nombre, luego usa modificacion."""
+        fecha = self._extract_date_from_name(file_path.stem)
+        if fecha:
+            logger.debug(f"Fecha extraida del nombre: {file_path.name} → {fecha.date()}")
+            return fecha
+        return datetime.fromtimestamp(file_path.stat().st_mtime)
+
     def classify(self, file_path: Path) -> Optional[Path]:
         """Determina la carpeta destino de un archivo segun su extension."""
         ext = file_path.suffix.lower()
@@ -51,7 +84,7 @@ class FileOrganizer:
         if info:
             destino = self.output_folder / info["destino"]
             if info["subcarpeta_por_año"]:
-                fecha = datetime.fromtimestamp(file_path.stat().st_mtime)
+                fecha = self._get_fecha(file_path)
                 destino = destino / str(fecha.year)
                 if info["subcarpeta_por_mes"]:
                     destino = destino / self.MESES[fecha.month]
