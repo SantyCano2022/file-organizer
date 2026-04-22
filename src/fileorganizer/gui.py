@@ -13,6 +13,7 @@ from plyer import notification
 from watchdog.observers import Observer
 
 from fileorganizer.organizer import FileOrganizer
+from fileorganizer.updater import VERSION, download_and_apply, get_latest_release, is_newer
 from fileorganizer.watcher import OrganizeHandler
 
 ctk.set_appearance_mode("dark")
@@ -79,6 +80,7 @@ class App(ctk.CTk):
         self._attach_logger()
         self._setup_tray()
         self.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+        self.after(2500, lambda: threading.Thread(target=self._check_for_updates, daemon=True).start())
 
     # ── Persistencia ──────────────────────────────────────────────────────────
 
@@ -223,6 +225,62 @@ class App(ctk.CTk):
     def _attach_logger(self):
         self._log_handler = _GUILogHandler(self._append_log)
         logging.getLogger("FileOrganizer").addHandler(self._log_handler)
+
+    # ── Actualizaciones ───────────────────────────────────────────────────────
+
+    def _check_for_updates(self):
+        result = get_latest_release()
+        if result and is_newer(result[0]):
+            tag, url = result
+            self.after(0, self._show_update_dialog, tag, url)
+
+    def _show_update_dialog(self, tag: str, url: str):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Actualización disponible")
+        dialog.geometry("420x200")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        dialog.lift()
+
+        ctk.CTkLabel(
+            dialog, text=f"Nueva versión disponible: {tag}",
+            font=("Segoe UI", 15, "bold"),
+        ).pack(pady=(24, 6))
+        ctk.CTkLabel(
+            dialog,
+            text="El programa se cerrará, se actualizará solo\ny se volverá a abrir con la nueva versión.",
+            font=("Segoe UI", 12), text_color=MUTED,
+        ).pack(pady=(0, 20))
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack()
+        ctk.CTkButton(
+            btn_row, text="Actualizar ahora", width=150,
+            fg_color=BTN_BLUE, hover_color=BTN_BLUE_HOVER,
+            command=lambda: self._do_update(dialog, url),
+        ).pack(side="left", padx=8)
+        ctk.CTkButton(
+            btn_row, text="Ahora no", width=110,
+            fg_color=BTN_GRAY, hover_color=BTN_GRAY_HOVER,
+            command=dialog.destroy,
+        ).pack(side="left", padx=8)
+
+    def _do_update(self, dialog: ctk.CTkToplevel, url: str):
+        dialog.destroy()
+        self._append_log(f"Descargando actualización...")
+
+        def run():
+            def progress(pct):
+                self._append_log(f"  Descargando... {int(pct * 100)}%")
+
+            ok = download_and_apply(url, on_progress=progress)
+            if ok:
+                self._append_log("Descarga completa. Cerrando para aplicar la actualización...")
+                self.after(1500, self._do_quit)
+            else:
+                self._append_log("Error al descargar. Intentá de nuevo más tarde.")
+
+        threading.Thread(target=run, daemon=True).start()
 
     # ── System Tray ───────────────────────────────────────────────────────────
 
