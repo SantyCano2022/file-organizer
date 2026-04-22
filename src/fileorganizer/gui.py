@@ -117,10 +117,16 @@ class App(ctk.CTk):
         # Header
         header = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=0)
         header.pack(fill="x")
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.pack(side="left", padx=24, pady=12)
         ctk.CTkLabel(
-            header, text="File Organizer",
+            title_frame, text="File Organizer",
             font=("Segoe UI", 22, "bold"), text_color="white",
-        ).pack(side="left", padx=24, pady=16)
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            title_frame, text="© 2026 Cano SAS Dev",
+            font=("Segoe UI", 10), text_color="#64748b",
+        ).pack(anchor="w")
         self.status_label = ctk.CTkLabel(
             header, text="● Detenido",
             font=("Segoe UI", 12), text_color=RED,
