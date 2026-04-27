@@ -5,7 +5,7 @@ Automatización de archivos que monitorea una carpeta en tiempo real y clasifica
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-12%20passed-brightgreen?logo=pytest)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
-![Version](https://img.shields.io/badge/Version-1.2.0-blue)
+![Version](https://img.shields.io/badge/Version-1.3.1-blue)
 
 ---
 
@@ -44,12 +44,20 @@ Los archivos que todavía se están descargando (`.crdownload`, `.part`, `.tmp`)
 - **Bandeja del sistema** — al cerrar la ventana el programa sigue corriendo en segundo plano (área de notificaciones al lado del reloj)
 - **Notificaciones de Windows** — cada archivo movido muestra una notificación con el nombre y la carpeta destino
 - **Iniciar con Windows** — checkbox en la app para que arranque automáticamente al encender la PC
-- **Botón Deshacer** — revierte el último movimiento con un clic (historial de 20 movimientos)
+- **Deshacer** — revierte el último movimiento desde Inicio, o cualquier movimiento individual desde el Historial
+- **Vista previa (dry-run)** — muestra qué archivos se moverían y a dónde, sin mover nada
+- **Historial con búsqueda** — registro persistente de hasta 2 000 movimientos con filtro en tiempo real por nombre, categoría o destino
+- **Programación automática** — organiza en un horario fijo (día y hora configurables)
+- **Perfiles de reglas** — múltiples conjuntos de reglas para distintos flujos de trabajo (trabajo, personal, etc.)
+- **Estadísticas visuales** — gráfica de actividad por día y distribución por categoría
+- **Manual integrado** — guía de uso completa dentro de la app (pestaña Manual)
+- **Wizard de bienvenida** — tour interactivo que aparece en el primer inicio
 - **Detección de fecha en el nombre del archivo** — organiza por la fecha del nombre si la tiene, o por fecha de modificación si no
 - 11 categorías predefinidas: Imágenes, Videos, Música, PDF, Word, Excel, Código, Comprimidos, Instaladores y más
 - Subcarpetas por año y mes: `Imagenes/2026/Abril/`, `Documentos/PDF/2025/Junio/`
 - Manejo de archivos duplicados: renombra, reemplaza o ignora según configuración
-- Reglas completamente editables en `config/rules.yaml` sin tocar el código
+- Reglas completamente editables sin tocar el código, con editor visual en la pestaña Reglas
+- **Auto-actualización** — comprueba nuevas versiones en GitHub al iniciar y se actualiza sola
 
 ---
 
@@ -62,7 +70,10 @@ file-organizer/
 │   └── fileorganizer/
 │       ├── organizer.py        # Motor de clasificación y movimiento de archivos
 │       ├── watcher.py          # Monitor del sistema de archivos en tiempo real
-│       ├── gui.py              # Interfaz gráfica
+│       ├── gui.py              # Interfaz gráfica completa
+│       ├── history.py          # Persistencia del historial de movimientos
+│       ├── scheduler.py        # Programación de organización automática por horario
+│       ├── updater.py          # Auto-actualización desde GitHub Releases
 │       └── logger.py           # Configuración de logs
 │
 ├── config/
@@ -74,6 +85,7 @@ file-organizer/
 ├── scripts/
 │   └── setup_autostart.py      # Configura el arranque automático en Windows (CLI)
 │
+├── FileOrganizer.spec          # Configuración de empaquetado PyInstaller
 ├── main.py                     # Entrada por línea de comandos
 └── main_gui.py                 # Entrada con interfaz gráfica
 ```

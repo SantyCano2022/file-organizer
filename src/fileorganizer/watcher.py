@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from typing import Callable, Optional
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedEvent
@@ -10,20 +11,33 @@ logger = setup_logger()
 
 
 class OrganizeHandler(FileSystemEventHandler):
-    def __init__(self, organizer, watch_folder: Path):
+    def __init__(self, organizer, watch_folder: Path,
+                 on_folder_detected: Optional[Callable] = None):
         super().__init__()
         self.organizer = organizer
         self.watch_folder = watch_folder
-        self._processing = set()  # evita procesar el mismo archivo dos veces
+        self._processing = set()
+        self._on_folder_detected = on_folder_detected
 
-    def on_created(self, event: FileCreatedEvent):
+    def on_created(self, event):
         if event.is_directory:
+            folder = Path(event.src_path)
+            if folder.parent == self.watch_folder and self._on_folder_detected:
+                time.sleep(0.5)
+                files = [f for f in folder.rglob("*") if f.is_file()]
+                if files:
+                    self._on_folder_detected(folder, len(files))
             return
         self._handle(Path(event.src_path))
 
-    def on_moved(self, event: FileMovedEvent):
-        # Captura archivos que terminan de descargarse (renombrado de .crdownload → .pdf)
+    def on_moved(self, event):
         if event.is_directory:
+            dest = Path(event.dest_path)
+            if dest.parent == self.watch_folder and self._on_folder_detected:
+                time.sleep(0.5)
+                files = [f for f in dest.rglob("*") if f.is_file()]
+                if files:
+                    self._on_folder_detected(dest, len(files))
             return
         dest = Path(event.dest_path)
         if dest.parent == self.watch_folder:
@@ -34,7 +48,6 @@ class OrganizeHandler(FileSystemEventHandler):
             return
         if file_path.parent != self.watch_folder:
             return
-
         self._processing.add(file_path)
         try:
             logger.debug(f"Nuevo archivo detectado: {file_path.name}")
@@ -52,7 +65,6 @@ class FolderWatcher:
     def start(self):
         if not self.watch_folder.exists():
             raise FileNotFoundError(f"La carpeta a monitorear no existe: {self.watch_folder}")
-
         handler = OrganizeHandler(self.organizer, self.watch_folder)
         self._observer = Observer()
         self._observer.schedule(handler, str(self.watch_folder), recursive=False)
@@ -66,7 +78,6 @@ class FolderWatcher:
             logger.info("Monitor detenido.")
 
     def run_forever(self):
-        """Corre hasta que el usuario presione Ctrl+C."""
         self.start()
         try:
             while True:

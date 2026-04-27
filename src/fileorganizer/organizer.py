@@ -1,3 +1,4 @@
+import fnmatch
 import re
 import shutil
 import time
@@ -8,6 +9,7 @@ from typing import Callable, Optional
 
 import yaml
 
+from fileorganizer.history import append_move as _hist_append
 from fileorganizer.logger import setup_logger
 
 logger = setup_logger()
@@ -15,7 +17,8 @@ logger = setup_logger()
 
 class FileOrganizer:
     def __init__(self, config_path: str, output_folder: str, move_delay: int = 3,
-                 on_file_moved: Optional[Callable[[str, str], None]] = None):
+                 on_file_moved: Optional[Callable[[str, str], None]] = None,
+                 exclusion_patterns: list = None):
         self.output_folder = Path(output_folder)
         self.move_delay = move_delay
         self.config = self._load_config(config_path)
@@ -24,6 +27,7 @@ class FileOrganizer:
         self.on_file_moved = on_file_moved
         self.move_history: deque = deque(maxlen=20)
         self._batch_mode = False
+        self.exclusion_patterns: list = exclusion_patterns or []
 
     def _load_config(self, config_path: str) -> dict:
         with open(config_path, "r", encoding="utf-8") as f:
@@ -140,6 +144,11 @@ class FileOrganizer:
             logger.debug(f"Ignorando archivo temporal: {file_path.name}")
             return False
 
+        for pat in self.exclusion_patterns:
+            if fnmatch.fnmatch(file_path.name.lower(), pat.lower()):
+                logger.debug(f"Excluido por patron '{pat}': {file_path.name}")
+                return False
+
         if not self._is_file_ready(file_path):
             logger.warning(f"Archivo en uso, se reintentara: {file_path.name}")
             return False
@@ -162,6 +171,7 @@ class FileOrganizer:
             logger.info(f"[{cat_name}] {file_path.name}  →  {destino_final.parent}")
             self.stats["movidos"] += 1
             self.move_history.append((file_path, destino_final))
+            _hist_append(file_path.name, str(file_path), str(destino_final), cat_name)
             if not self._batch_mode and self.on_file_moved:
                 try:
                     self.on_file_moved(file_path.name, str(destino_final.parent))
@@ -189,6 +199,37 @@ class FileOrganizer:
                 self.move_file(file_path)
         finally:
             self._batch_mode = False
+
+    def organize_folder(self, folder: Path):
+        """Organiza todos los archivos de una carpeta caída recursivamente."""
+        files = [f for f in folder.rglob("*") if f.is_file()]
+        if not files:
+            return
+        self._batch_mode = True
+        logger.info(f"Organizando carpeta '{folder.name}': {len(files)} archivos...")
+        count = 0
+        try:
+            for file_path in files:
+                if self.move_file(file_path):
+                    count += 1
+        finally:
+            self._batch_mode = False
+        for d in sorted(folder.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if d.is_dir():
+                try:
+                    d.rmdir()
+                except OSError:
+                    pass
+        try:
+            folder.rmdir()
+        except OSError:
+            pass
+        if self.on_file_moved:
+            try:
+                self.on_file_moved(f"[Carpeta] {folder.name}",
+                                   f"{count} archivos organizados")
+            except Exception:
+                pass
 
     def undo_last(self) -> bool:
         """Revierte el último movimiento registrado."""
