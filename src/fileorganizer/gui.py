@@ -1269,8 +1269,7 @@ class App(ctk.CTk):
     ]
 
     def _maybe_show_welcome(self):
-        if self._load_settings().get("first_run", True):
-            self._show_welcome_wizard()
+        self._show_welcome_wizard()
 
     def _show_welcome_wizard(self):
         STEPS = self._WELCOME_STEPS
