@@ -5,7 +5,7 @@ Automatización de archivos que monitorea una carpeta en tiempo real y clasifica
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-12%20passed-brightgreen?logo=pytest)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
-![Version](https://img.shields.io/badge/Version-1.3.1-blue)
+![Version](https://img.shields.io/badge/Version-1.4.0-blue)
 
 ---
 

@@ -5,7 +5,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 _REPO   = "SantyCano2022/file-organizer"
 _API    = f"https://api.github.com/repos/{_REPO}/releases/latest"
 
